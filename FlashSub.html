@@ -1,0 +1,1171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>字幕播放器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .main-content {
+            padding: 20px;
+        }
+
+        .video-container {
+            position: relative;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        video {
+            width: 100%;
+            height: auto;
+            display: block;
+            background: #000;
+            cursor: pointer;
+        }
+
+        /* Edge兼容字幕样式 */
+        video::cue {
+            color: white;
+            font-size: 24px;
+            line-height: 1.1;
+            text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.9);
+            background: none;
+            padding: 0;
+            margin: 0;
+            text-align: center;
+            white-space: pre-line;
+            font-weight: 600;
+        }
+
+        /* 速度提示 */
+        .speed-overlay {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 12px 18px;
+            border-radius: 8px;
+            font-size: 20px;
+            font-weight: bold;
+            z-index: 2147483647;
+            transition: all 0.3s ease;
+            opacity: 0;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .speed-overlay.show {
+            opacity: 1;
+            animation: slideIn 0.4s ease;
+        }
+
+        @keyframes slideIn {
+            0% { transform: scale(0.8) translateX(-20px); opacity: 0; }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1) translateX(0); opacity: 1; }
+        }
+
+        .progress-overlay {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            z-index: 2147483647;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .progress-overlay.show {
+            opacity: 1;
+            animation: fadeInScale 0.3s ease;
+        }
+
+        @keyframes fadeInScale {
+            0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+
+        .controls-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .upload-section, .subtitle-controls, .speed-controls {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #dee2e6;
+        }
+
+        .upload-section h3, .subtitle-controls h3, .speed-controls h3 {
+            margin-bottom: 15px;
+            color: #495057;
+        }
+
+        .file-input-group {
+            margin-bottom: 15px;
+            position: relative;
+        }
+
+        .file-input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #495057;
+        }
+
+        .file-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            background: white;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .file-input::file-selector-button {
+            padding: 8px 12px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            background-color: #f8f9fa;
+            color: #495057;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+
+        .subtitle-buttons, .speed-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            flex: 1;
+            min-width: 80px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #5a6fd8, #6a4190);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #545b62;
+            transform: translateY(-1px);
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #1e7e34;
+            transform: translateY(-1px);
+        }
+
+        .btn.active {
+            background: linear-gradient(135deg, #17a2b8, #138496);
+            box-shadow: 0 0 0 3px rgba(23, 162, 184, 0.3);
+            transform: scale(1.05);
+        }
+
+        .keyboard-hint {
+            background: linear-gradient(135deg, #e3f2fd, #f3e5f5);
+            border: 1px solid #90caf9;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-size: 16px;
+            color: #1565c0;
+            text-align: center;
+        }
+
+        .keyboard-hint kbd {
+            background: linear-gradient(135deg, #1976d2, #7e57c2);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            margin: 0 3px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .sentence-extractor {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+
+        .sentence-extractor h3 {
+            margin-bottom: 15px;
+            color: #495057;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .sentence-counter {
+            background: #667eea;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+
+        .sentence-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 15px;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+        }
+
+        .sentence-item {
+            display: flex;
+            align-items: flex-start;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            transition: all 0.3s ease;
+        }
+
+        .sentence-item:hover {
+            background: #e9ecef;
+            transform: translateX(2px);
+        }
+
+        .sentence-checkbox {
+            margin-right: 10px;
+            margin-top: 2px;
+            transform: scale(1.2);
+            accent-color: #667eea;
+        }
+
+        .sentence-text {
+            flex: 1;
+            font-size: 14px;
+            color: #495057;
+            line-height: 1.4;
+            word-break: break-word;
+        }
+
+        .sentence-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .sentence-actions button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .extract-btn {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+        }
+
+        .extract-btn:hover {
+            background: linear-gradient(135deg, #218838, #1e7e34);
+            transform: translateY(-1px);
+        }
+
+        .delete-selected-btn {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            color: white;
+        }
+
+        .delete-selected-btn:hover {
+            background: linear-gradient(135deg, #c82333, #bd2130);
+            transform: translateY(-1px);
+        }
+
+        .copy-selected-btn {
+            background: linear-gradient(135deg, #17a2b8, #138496);
+            color: white;
+        }
+
+        .copy-selected-btn:hover {
+            background: linear-gradient(135deg, #138496, #117a8b);
+            transform: translateY(-1px);
+        }
+
+        .clear-all-btn {
+            background: linear-gradient(135deg, #6c757d, #5a6268);
+            color: white;
+        }
+
+        .clear-all-btn:hover {
+            background: linear-gradient(135deg, #5a6268, #495057);
+            transform: translateY(-1px);
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #6c757d;
+            font-style: italic;
+            padding: 20px;
+        }
+
+        .batch-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+
+        @media (max-width: 768px) {
+            .controls-panel {
+                grid-template-columns: 1fr;
+            }
+            
+            .btn {
+                padding: 15px;
+                font-size: 16px;
+            }
+            
+            .speed-overlay, .progress-overlay {
+                font-size: 18px;
+                padding: 15px 20px;
+            }
+            
+            .sentence-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .sentence-item.new {
+            animation: pulse 0.5s ease;
+            border-left-color: #28a745;
+        }
+        
+        /* 新增状态消息样式 */
+        .message {
+            padding: 10px 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Edge字幕播放器</h1>
+            <p>支持字幕显示和句子提取功能</p>
+        </div>
+
+        <div class="main-content">
+            <!-- 视频播放区域 -->
+            <div class="video-container">
+                <video id="videoPlayer" controls preload="metadata" muted>
+                    您的浏览器不支持视频播放。
+                </video>
+                
+                <!-- 速度提示 -->
+                <div class="speed-overlay" id="speedOverlay">1.0x</div>
+                <div class="progress-overlay" id="progressOverlay">+3s</div>
+            </div>
+
+            <!-- 控制面板 -->
+            <div class="controls-panel">
+                <!-- 文件上传区域 -->
+                <div class="upload-section">
+                    <h3>📁 文件上传（可选）</h3>
+                    
+                    <div class="file-input-group">
+                        <label for="videoFile">视频文件:</label>
+                        <input type="file" id="videoFile" class="file-input" accept="video/*">
+                    </div>
+                    
+                    <div class="file-input-group">
+                        <label for="englishSubtitle">英文字幕 (.srt):</label>
+                        <input type="file" id="englishSubtitle" class="file-input" accept=".srt">
+                    </div>
+                    
+                    <div class="file-input-group">
+                        <label for="chineseSubtitle">中文字幕 (.srt):</label>
+                        <input type="file" id="chineseSubtitle" class="file-input" accept=".srt">
+                    </div>
+                    
+                    <div class="file-input-group">
+                        <label for="bilingualSubtitle">中英文字幕 (.srt):</label>
+                        <input type="file" id="bilingualSubtitle" class="file-input" accept=".srt">
+                    </div>
+                </div>
+
+                <!-- 字幕控制区域 -->
+                <div class="subtitle-controls">
+                    <h3>🎬 字幕控制</h3>
+                    <div class="subtitle-buttons">
+                        <button class="btn btn-primary" id="englishBtn">英文 (E)</button>
+                        <button class="btn btn-primary" id="chineseBtn">中文 (C)</button>
+                        <button class="btn btn-primary" id="bilingualBtn">中英 (B)</button>
+                        <button class="btn btn-secondary" id="offBtn">关闭 (D)</button>
+                    </div>
+                </div>
+
+                <!-- 速度控制区域 -->
+                <div class="speed-controls">
+                    <h3>⚡ 播放控制</h3>
+                    <div class="speed-display" id="speedControlDisplay">1.0x</div>
+                    <div class="speed-buttons">
+                        <button class="btn btn-secondary" id="slowDownBtn">减速 ↓</button>
+                        <button class="btn btn-primary" id="normalSpeedBtn">正常</button>
+                        <button class="btn btn-secondary" id="speedUpBtn">加速 ↑</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 句子提取区域 -->
+            <div class="sentence-extractor">
+                <h3>
+                    📖 句子提取
+                    <span class="sentence-counter" id="sentenceCounter">0</span>
+                </h3>
+                
+                <div class="sentence-list" id="sentenceList">
+                    <div class="empty-state">暂无提取的句子，按 S 键提取当前英文字幕句子</div>
+                </div>
+                
+                <div class="sentence-actions">
+                    <button class="delete-selected-btn" id="deleteSelectedBtn">删除选中</button>
+                    <button class="copy-selected-btn" id="copySelectedBtn">复制选中</button>
+                    <button class="clear-all-btn" id="clearAllBtn">清空所有</button>
+                </div>
+            </div>
+
+            <!-- 键盘控制说明 -->
+            <div class="keyboard-hint">
+                <strong>🎮 Edge键盘控制:</strong><br>
+                <kbd>←</kbd> 后退3秒 | <kbd>→</kbd> 前进3秒 | <kbd>↑</kbd> 加速0.5x | <kbd>↓</kbd> 减速0.5x<br>
+                <kbd>空格</kbd> 播放/暂停 | <kbd>S</kbd> 提取句子 | <kbd>E</kbd> 英文 | <kbd>C</kbd> 中文 | <kbd>B</kbd> 中英 | <kbd>D</kbd> 关闭<br>
+                <kbd>F</kbd> 全屏切换
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class EdgeSubtitlePlayer {
+            constructor() {
+                this.video = document.getElementById('videoPlayer');
+                this.speedOverlay = document.getElementById('speedOverlay');
+                this.progressOverlay = document.getElementById('progressOverlay');
+                this.currentSpeed = 1.0;
+                this.speedRange = { min: 0.5, max: 5.0, step: 0.5 };
+                this.seekStep = 3;
+                this.tracks = {
+                    english: null,
+                    chinese: null,
+                    bilingual: null
+                };
+                this.extractedSentences = [];
+                this.sentenceIdCounter = 0;
+                this.isFullscreen = false;
+                
+                this.init();
+            }
+
+            init() {
+                this.createTextTracks();
+                this.setupEventListeners();
+                this.setupKeyboardControls();
+                this.updateSpeedDisplay();
+                this.renderSentences();
+                this.setupDefaultSubtitle();
+            }
+
+            createTextTracks() {
+                this.tracks.english = this.video.addTextTrack('subtitles', 'English', 'en');
+                this.tracks.chinese = this.video.addTextTrack('subtitles', '中文', 'zh');
+                this.tracks.bilingual = this.video.addTextTrack('subtitles', '中英双语', 'zh-cn');
+            }
+
+            setupDefaultSubtitle() {
+                // 默认启用英文字幕
+                this.tracks.english.mode = 'showing';
+                document.getElementById('englishBtn').classList.add('active');
+            }
+
+            setupEventListeners() {
+                // 文件上传事件
+                document.getElementById('videoFile').addEventListener('change', (e) => {
+                    this.loadVideo(e.target.files[0]);
+                });
+
+                // 字幕上传事件
+                ['english', 'chinese', 'bilingual'].forEach(type => {
+                    document.getElementById(`${type}Subtitle`).addEventListener('change', (e) => {
+                        this.loadSubtitle(e.target.files[0], type, type === 'chinese' || type === 'bilingual' ? 'gbk' : 'utf-8');
+                    });
+                });
+
+                // 字幕按钮事件
+                document.getElementById('englishBtn').addEventListener('click', () => {
+                    this.toggleSubtitle('english');
+                });
+                document.getElementById('chineseBtn').addEventListener('click', () => {
+                    this.toggleSubtitle('chinese');
+                });
+                document.getElementById('bilingualBtn').addEventListener('click', () => {
+                    this.toggleSubtitle('bilingual');
+                });
+                document.getElementById('offBtn').addEventListener('click', () => {
+                    this.toggleSubtitle('off');
+                });
+
+                // 速度控制按钮事件
+                document.getElementById('slowDownBtn').addEventListener('click', () => {
+                    this.adjustSpeed(-0.5);
+                });
+                document.getElementById('normalSpeedBtn').addEventListener('click', () => {
+                    this.resetSpeed();
+                });
+                document.getElementById('speedUpBtn').addEventListener('click', () => {
+                    this.adjustSpeed(0.5);
+                });
+
+                // 句子操作按钮事件
+                document.getElementById('deleteSelectedBtn').addEventListener('click', () => {
+                    this.deleteSelectedSentences();
+                });
+                document.getElementById('copySelectedBtn').addEventListener('click', () => {
+                    this.copySelectedSentences();
+                });
+                document.getElementById('clearAllBtn').addEventListener('click', () => {
+                    this.clearAllSentences();
+                });
+
+                // 视频点击事件
+                this.video.addEventListener('click', () => {
+                    this.togglePlayPause();
+                });
+                
+                // 监听全屏变化
+                document.addEventListener('fullscreenchange', () => {
+                    this.isFullscreen = !!document.fullscreenElement;
+                });
+            }
+
+            setupKeyboardControls() {
+                const handleKeyDown = (e) => {
+                    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+                    let handled = true;
+
+                    switch(e.code || e.key) {
+                        case 'Space':
+                        case ' ':
+                            e.preventDefault();
+                            this.togglePlayPause();
+                            break;
+                            
+                        case 'KeyA':
+                        case 'a':
+                        case 'A':
+                            e.preventDefault();
+                            this.togglePlayPause();
+                            break;
+                            
+                        case 'ArrowLeft':
+                        case 'Left':
+                            e.preventDefault();
+                            this.seek(-this.seekStep);
+                            break;
+                            
+                        case 'ArrowRight':
+                        case 'Right':
+                            e.preventDefault();
+                            this.seek(this.seekStep);
+                            break;
+                            
+                        case 'ArrowUp':
+                        case 'Up':
+                            e.preventDefault();
+                            this.adjustSpeed(this.speedRange.step);
+                            break;
+                            
+                        case 'ArrowDown':
+                        case 'Down':
+                            e.preventDefault();
+                            this.adjustSpeed(-this.speedRange.step);
+                            break;
+                            
+                        case 'KeyS':
+                        case 's':
+                        case 'S':
+                            e.preventDefault();
+                            this.extractCurrentSentence();
+                            break;
+                            
+                        case 'KeyE':
+                        case 'e':
+                        case 'E':
+                            e.preventDefault();
+                            this.toggleSubtitle('english');
+                            break;
+                            
+                        case 'KeyC':
+                        case 'c':
+                        case 'C':
+                            e.preventDefault();
+                            this.toggleSubtitle('chinese');
+                            break;
+                            
+                        case 'KeyB':
+                        case 'b':
+                        case 'B':
+                            e.preventDefault();
+                            this.toggleSubtitle('bilingual');
+                            break;
+                            
+                        case 'KeyD':
+                        case 'd':
+                        case 'D':
+                            e.preventDefault();
+                            this.toggleSubtitle('off');
+                            break;
+                            
+                        case 'KeyF':
+                        case 'f':
+                        case 'F':
+                            e.preventDefault();
+                            this.toggleFullscreen();
+                            break;
+                            
+                        default:
+                            handled = false;
+                    }
+
+                    if (handled) e.stopImmediatePropagation();
+                };
+
+                document.addEventListener('keydown', handleKeyDown, { capture: true, passive: false });
+                window.addEventListener('keydown', handleKeyDown, { capture: true, passive: false });
+                
+                this.video.setAttribute('tabindex', '0');
+                this.video.style.outline = 'none';
+            }
+
+            toggleFullscreen() {
+                if (!document.fullscreenElement) {
+                    if (this.video.requestFullscreen) {
+                        this.video.requestFullscreen();
+                    } else if (this.video.mozRequestFullScreen) {
+                        this.video.mozRequestFullScreen();
+                    } else if (this.video.webkitRequestFullscreen) {
+                        this.video.webkitRequestFullscreen();
+                    } else if (this.video.msRequestFullscreen) {
+                        this.video.msRequestFullscreen();
+                    }
+                    this.isFullscreen = true;
+                } else {
+                    if (document.exitFullscreen) {
+                        document.exitFullscreen();
+                    } else if (document.mozCancelFullScreen) {
+                        document.mozCancelFullScreen();
+                    } else if (document.webkitExitFullscreen) {
+                        document.webkitExitFullscreen();
+                    } else if (document.msExitFullscreen) {
+                        document.msExitFullscreen();
+                    }
+                    this.isFullscreen = false;
+                }
+            }
+
+            loadVideo(file) {
+                if (!file) return;
+                
+                const url = URL.createObjectURL(file);
+                this.video.src = url;
+                this.video.load();
+                
+                this.video.addEventListener('loadedmetadata', () => {
+                    this.video.pause();
+                    this.showMessage('视频已加载，默认暂停状态', 'success');
+                });
+                
+                this.video.volume = 1.0;
+                this.video.muted = false;
+            }
+
+            async loadSubtitle(file, type, encoding = 'utf-8') {
+                if (!file) return;
+
+                try {
+                    const text = await this.readFileAsText(file, encoding);
+                    const processedContent = type === 'bilingual' 
+                        ? this.processBilingualSubtitle(text)
+                        : this.processMonolingualSubtitle(text, type);
+                    
+                    this.addSubtitlesToTrack(processedContent, this.tracks[type]);
+                    this.showMessage(`${this.getTypeName(type)}字幕加载成功！`, 'success');
+                    
+                    // 如果这是第一个加载的字幕，自动启用
+                    if (this.extractedSentences.length === 0 && this.tracks[type].mode === 'disabled') {
+                        this.toggleSubtitle(type);
+                    }
+                } catch (error) {
+                    this.showMessage(`${this.getTypeName(type)}字幕加载失败: ${error.message}`, 'error');
+                }
+            }
+
+            readFileAsText(file, encoding) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    
+                    reader.onload = (e) => {
+                        let text = e.target.result;
+                        if (encoding === 'gbk') {
+                            try {
+                                const decoder = new TextDecoder('gb18030');
+                                const buffer = new Uint8Array(e.target.result);
+                                text = decoder.decode(buffer);
+                            } catch (err) {
+                                console.warn('GB18030解码失败', err);
+                            }
+                        }
+                        resolve(text.replace(/^\uFEFF/, ''));
+                    };
+                    
+                    reader.onerror = reject;
+                    encoding === 'gbk' ? reader.readAsArrayBuffer(file) : reader.readAsText(file, 'utf-8');
+                });
+            }
+
+            processMonolingualSubtitle(srtContent, type) {
+                const lines = srtContent.trim().split(/\r?\n/);
+                let vttContent = 'WEBVTT\n\n';
+                
+                let i = 0;
+                while (i < lines.length) {
+                    const line = lines[i].trim();
+                    if (line.match(/^\d+$/)) {
+                        i++;
+                        if (i < lines.length && lines[i].includes('-->')) {
+                            const timeLine = lines[i].replace(/,/g, '.');
+                            let text = '';
+                            i++;
+                            while (i < lines.length && lines[i].trim() && !lines[i].match(/^\d+$/)) {
+                                text += lines[i].trim() + ' ';
+                                i++;
+                            }
+                            if (text.trim()) {
+                                vttContent += timeLine + '\n' + text.trim() + '\n\n';
+                            }
+                        }
+                    } else {
+                        i++;
+                    }
+                }
+                return vttContent;
+            }
+
+            processBilingualSubtitle(srtContent) {
+                const lines = srtContent.trim().split(/\r?\n/);
+                let vttContent = 'WEBVTT\n\n';
+                
+                let i = 0;
+                while (i < lines.length) {
+                    const line = lines[i].trim();
+                    if (line.match(/^\d+$/)) {
+                        i++;
+                        if (i < lines.length && lines[i].includes('-->')) {
+                            const timeLine = lines[i].replace(/,/g, '.');
+                            let chineseText = '';
+                            let englishText = '';
+                            
+                            i++;
+                            while (i < lines.length && lines[i].trim() && !lines[i].match(/^[^\u4e00-\u9fa5]+$/) && !lines[i].match(/^\d+$/)) {
+                                chineseText += lines[i].trim() + ' ';
+                                i++;
+                            }
+                            
+                            while (i < lines.length && lines[i].trim() && lines[i].match(/^[^\u4e00-\u9fa5]+$/) && !lines[i].match(/^\d+$/)) {
+                                englishText += lines[i].trim() + ' ';
+                                i++;
+                            }
+                            
+                            if (chineseText.trim() || englishText.trim()) {
+                                const combinedText = `${chineseText.trim()}\n${englishText.trim()}`.trim();
+                                vttContent += timeLine + '\n' + combinedText + '\n\n';
+                            }
+                        }
+                    } else {
+                        i++;
+                    }
+                }
+                return vttContent;
+            }
+
+            addSubtitlesToTrack(vttContent, track) {
+                if (!track) return;
+                
+                while (track.cues && track.cues.length > 0) {
+                    track.removeCue(track.cues[0]);
+                }
+
+                const lines = vttContent.split('\n');
+                let i = 2;
+
+                while (i < lines.length) {
+                    const line = lines[i].trim();
+                    if (line.includes('-->')) {
+                        const [start, end] = line.split(' --> ');
+                        let text = '';
+                        i++;
+                        while (i < lines.length && lines[i].trim() && !lines[i].includes('-->')) {
+                            text += lines[i].trim() + '\n';
+                            i++;
+                        }
+                        if (start && end && text.trim()) {
+                            try {
+                                const cue = new VTTCue(
+                                    this.parseTime(start.trim()),
+                                    this.parseTime(end.trim()),
+                                    text.trim()
+                                );
+                                cue.line = -2;
+                                cue.align = 'center';
+                                cue.position = 50;
+                                track.addCue(cue);
+                            } catch (e) {
+                                console.error('添加字幕失败:', e);
+                            }
+                        }
+                    } else {
+                        i++;
+                    }
+                }
+            }
+
+            parseTime(timeStr) {
+                const parts = timeStr.split(':');
+                if (parts.length === 3) {
+                    const [hours, minutes, seconds] = parts;
+                    const [secs, ms] = seconds.split('.');
+                    return parseInt(hours) * 3600 + parseInt(minutes) * 60 + parseInt(secs) + (parseFloat('0.' + (ms || '0')));
+                }
+                return 0;
+            }
+
+            togglePlayPause() {
+                if (this.video.paused) {
+                    this.video.play().catch(e => {
+                        console.log('Play prevented:', e);
+                        this.video.muted = false;
+                        this.video.play();
+                    });
+                } else {
+                    this.video.pause();
+                }
+            }
+
+            seek(seconds) {
+                if (!this.video.duration) return;
+                const newTime = Math.max(0, Math.min(this.video.duration, this.video.currentTime + seconds));
+                this.video.currentTime = newTime;
+                this.showProgressIndicator(seconds > 0 ? `+${seconds}s` : `${seconds}s`);
+            }
+
+            adjustSpeed(delta) {
+                const newSpeed = Math.max(
+                    this.speedRange.min,
+                    Math.min(this.speedRange.max, this.currentSpeed + delta)
+                );
+                
+                if (newSpeed !== this.currentSpeed) {
+                    this.currentSpeed = newSpeed;
+                    this.video.playbackRate = newSpeed;
+                    this.updateSpeedDisplay();
+                }
+            }
+
+            resetSpeed() {
+                this.currentSpeed = 1.0;
+                this.video.playbackRate = 1.0;
+                this.updateSpeedDisplay();
+            }
+
+            toggleSubtitle(type) {
+                Object.values(this.tracks).forEach(track => {
+                    if (track) track.mode = 'disabled';
+                });
+                document.querySelectorAll('.subtitle-buttons .btn').forEach(btn => btn.classList.remove('active'));
+
+                if (type !== 'off') {
+                    if (this.tracks[type]) this.tracks[type].mode = 'showing';
+                    document.getElementById(`${type}Btn`).classList.add('active');
+                } else {
+                    document.getElementById('offBtn').classList.add('active');
+                }
+            }
+
+            extractCurrentSentence() {
+                let currentSentence = null;
+                const currentTime = this.video.currentTime;
+                
+                ['english', 'bilingual'].forEach(type => {
+                    if (this.tracks[type] && this.tracks[type].cues) {
+                        for (let cue of this.tracks[type].cues) {
+                            if (currentTime >= cue.startTime && currentTime <= cue.endTime) {
+                                let text = cue.text;
+                                if (type === 'bilingual') {
+                                    const lines = text.split('\n');
+                                    text = lines.find(line => /[a-zA-Z]/.test(line)) || text;
+                                }
+                                currentSentence = text.trim();
+                                break;
+                            }
+                        }
+                    }
+                });
+
+                if (currentSentence) {
+                    this.addSentence(currentSentence);
+                    this.showMessage('句子已提取！', 'success');
+                } else {
+                    this.showMessage('当前无英文字幕', 'error');
+                }
+            }
+
+            addSentence(text) {
+                const sentence = {
+                    id: this.sentenceIdCounter++,
+                    text: text,
+                    timestamp: new Date().toLocaleTimeString(),
+                    videoTime: this.formatTime(this.video.currentTime)
+                };
+                
+                this.extractedSentences.push(sentence);
+                this.renderSentences();
+                this.updateSentenceCounter();
+            }
+
+            formatTime(seconds) {
+                const mins = Math.floor(seconds / 60);
+                const secs = Math.floor(seconds % 60);
+                return `${mins}:${secs.toString().padStart(2, '0')}`;
+            }
+
+            renderSentences() {
+                const container = document.getElementById('sentenceList');
+                const counter = document.getElementById('sentenceCounter');
+                
+                if (this.extractedSentences.length === 0) {
+                    container.innerHTML = '<div class="empty-state">暂无提取的句子，按 S 键提取当前英文字幕句子</div>';
+                    counter.textContent = '0';
+                    return;
+                }
+
+                container.innerHTML = this.extractedSentences.map((sentence, index) => `
+                    <div class="sentence-item ${index === this.extractedSentences.length - 1 ? 'new' : ''}" data-id="${sentence.id}">
+                        <input type="checkbox" class="sentence-checkbox" data-id="${sentence.id}">
+                        <div class="sentence-text">
+                            <strong>${sentence.text}</strong>
+                            <br>
+                            <small style="color: #6c757d;">时间: ${sentence.videoTime} | 提取: ${sentence.timestamp}</small>
+                        </div>
+                    </div>
+                `).join('');
+                
+                counter.textContent = this.extractedSentences.length;
+            }
+
+            deleteSelectedSentences() {
+                const checkboxes = document.querySelectorAll('.sentence-checkbox:checked');
+                const idsToDelete = Array.from(checkboxes).map(cb => parseInt(cb.dataset.id));
+                
+                this.extractedSentences = this.extractedSentences.filter(sentence => !idsToDelete.includes(sentence.id));
+                this.renderSentences();
+                this.showMessage(`已删除 ${idsToDelete.length} 个句子`, 'success');
+            }
+
+            copySelectedSentences() {
+                const checkboxes = document.querySelectorAll('.sentence-checkbox:checked');
+                const selectedSentences = Array.from(checkboxes).map(cb => {
+                    const id = parseInt(cb.dataset.id);
+                    const sentence = this.extractedSentences.find(s => s.id === id);
+                    return sentence ? sentence.text : '';
+                }).filter(text => text);
+                
+                if (selectedSentences.length === 0) {
+                    this.showMessage('请选择要复制的句子', 'error');
+                    return;
+                }
+                
+                const textToCopy = selectedSentences.join('\n');
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                    this.showMessage(`已复制 ${selectedSentences.length} 个句子`, 'success');
+                }).catch(() => {
+                    this.showMessage('复制失败，请手动复制', 'error');
+                });
+            }
+
+            clearAllSentences() {
+                if (this.extractedSentences.length > 0 && confirm('确定要清空所有提取的句子吗？')) {
+                    this.extractedSentences = [];
+                    this.renderSentences();
+                    this.showMessage('已清空所有句子', 'success');
+                }
+            }
+
+            updateSentenceCounter() {
+                document.getElementById('sentenceCounter').textContent = this.extractedSentences.length;
+            }
+
+            updateSpeedDisplay() {
+                this.speedOverlay.textContent = `${this.currentSpeed.toFixed(1)}x`;
+                document.getElementById('speedControlDisplay').textContent = `${this.currentSpeed.toFixed(1)}x`;
+                
+                this.speedOverlay.classList.add('show');
+                setTimeout(() => {
+                    this.speedOverlay.classList.remove('show');
+                }, 1000);
+            }
+
+            showProgressIndicator(text) {
+                this.progressOverlay.textContent = text;
+                this.progressOverlay.classList.add('show');
+                setTimeout(() => {
+                    this.progressOverlay.classList.remove('show');
+                }, 1000);
+            }
+
+            getTypeName(type) {
+                const names = {
+                    english: '英文',
+                    chinese: '中文',
+                    bilingual: '中英双语'
+                };
+                return names[type] || type;
+            }
+
+            showMessage(text, type) {
+                // 移除现有的消息
+                const existingMessages = document.querySelectorAll('.message');
+                existingMessages.forEach(msg => msg.remove());
+                
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${type}`;
+                messageDiv.textContent = text;
+
+                const container = document.querySelector('.main-content');
+                if (container) {
+                    container.insertBefore(messageDiv, container.firstChild);
+                    setTimeout(() => messageDiv.remove(), 3000);
+                }
+            }
+        }
+
+        // 初始化播放器
+        let player;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            player = new EdgeSubtitlePlayer();
+            window.player = player; // 使player在全局可访问
+        });
+    </script>
+</body>
+</html>
